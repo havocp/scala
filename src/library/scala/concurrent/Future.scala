@@ -538,6 +538,25 @@ trait Future[+T] extends Awaitable[T] {
     p.future
   }
 
+  /**
+   * Obtain a `scala.concurrent.FutureWithExecutionContext` where
+   * any callbacks added will run in the given context. This is
+   * only useful in Java, because you can't import an implicit
+   * `scala.concurrent.ExecutionContext`; there is no reason
+   * to use this in Scala.
+   */
+  final def withExecutionContext(executor: ExecutionContext): FutureWithExecutionContext[T] =
+    FutureWithExecutionContext(this, executor)
+
+  /**
+   * Obtain a `scala.concurrent.FutureWithExecutionContext` where
+   * any callbacks added will run in the default context. This is
+   * only useful in Java, because you can't import an implicit
+   * `scala.concurrent.ExecutionContext`; there is no reason
+   * to use this in Scala.
+   */
+  final def withDefaultExecutionContext: FutureWithExecutionContext[T] =
+    FutureWithExecutionContext(this, ExecutionContext.defaultExecutionContext)
 }
 
 
