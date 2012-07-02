@@ -579,6 +579,20 @@ object Future {
     classOf[Double]  -> classOf[jl.Double],
     classOf[Unit]    -> classOf[scala.runtime.BoxedUnit]
   )
+
+  /** Creates an already completed Future with the specified exception.
+   *  
+   *  @tparam T       the type of the value in the future
+   *  @return         the newly created `Future` object
+   */
+  def failed[T](exception: Throwable): Future[T] = Promise.failed(exception).future
+
+  /** Creates an already completed Future with the specified result.
+   *  
+   *  @tparam T       the type of the value in the future
+   *  @return         the newly created `Future` object
+   */
+  def successful[T](result: T): Future[T] = Promise.successful(result).future
   
   /** Starts an asynchronous computation and returns a `Future` object with the result of that computation.
   *

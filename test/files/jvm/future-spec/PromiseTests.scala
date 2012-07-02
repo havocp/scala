@@ -20,11 +20,13 @@ object PromiseTests extends MinimalScalaTest {
     "not be completed" in {
       val p = Promise()
       p.future.isCompleted mustBe (false)
+      p.isCompleted mustBe (false)
     }
     
     "have no value" in {
       val p = Promise()
       p.future.value mustBe (None)
+      p.isCompleted mustBe (false)
     }
     
     "return supplied value on timeout" in {
@@ -45,14 +47,16 @@ object PromiseTests extends MinimalScalaTest {
   
   "A successful Promise" should {
     val result = "test value"
-    val future = Promise[String]().complete(Right(result)).future
-    futureWithResult(_(future, result))
+    val promise = Promise[String]().complete(Right(result))
+    promise.isCompleted mustBe (true)
+    futureWithResult(_(promise.future, result))
   }
   
   "A failed Promise" should {
     val message = "Expected Exception"
-    val future = Promise[String]().complete(Left(new RuntimeException(message))).future
-    futureWithException[RuntimeException](_(future, message))
+    val promise = Promise[String]().complete(Left(new RuntimeException(message)))
+    promise.isCompleted mustBe (true)
+    futureWithException[RuntimeException](_(promise.future, message))
   }
   
   "An interrupted Promise" should {

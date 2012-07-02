@@ -64,11 +64,8 @@ private[concurrent] object Future {
   def apply[T](body: =>T)(implicit executor: ExecutionContext): Future[T] = {
     val task = new PromiseCompletingTask(executor, body)
     task.dispatch()
-
     task.promise.future
   }
-
-  private[impl] val throwableId: Throwable => Throwable = identity _
 
   // an optimization for batching futures
   // TODO we should replace this with a public queue,

@@ -15,7 +15,7 @@ object FutureTests extends MinimalScalaTest {
   
   def testAsync(s: String): Future[String] = s match {
     case "Hello"   => future { "World" }
-    case "Failure" => Promise.failed(new RuntimeException("Expected exception; to test fault-tolerance")).future
+    case "Failure" => Future.failed(new RuntimeException("Expected exception; to test fault-tolerance"))
     case "NoReply" => Promise[String]().future
   }
   
@@ -122,20 +122,20 @@ object FutureTests extends MinimalScalaTest {
       val r = new IllegalStateException("recovered")
       
       intercept[IllegalStateException] {
-        val failed = Promise.failed[String](o).future recoverWith {
-          case _ if false == true => Promise.successful("yay!").future
+        val failed = Future.failed[String](o) recoverWith {
+          case _ if false == true => Future.successful("yay!")
         }
         Await.result(failed, defaultTimeout)
       } mustBe (o)
       
-      val recovered = Promise.failed[String](o).future recoverWith {
-        case _ => Promise.successful("yay!").future
+      val recovered = Future.failed[String](o) recoverWith {
+        case _ => Future.successful("yay!")
       }
       Await.result(recovered, defaultTimeout) mustBe ("yay!")
       
       intercept[IllegalStateException] {
-        val refailed = Promise.failed[String](o).future recoverWith {
-          case _ => Promise.failed[String](r).future
+        val refailed = Future.failed[String](o) recoverWith {
+          case _ => Future.failed[String](r)
         }
         Await.result(refailed, defaultTimeout)
       } mustBe (r)
@@ -164,7 +164,7 @@ object FutureTests extends MinimalScalaTest {
     "firstCompletedOf" in {
       def futures = Vector.fill[Future[Int]](10) {
         Promise[Int]().future
-      } :+ Promise.successful[Int](5).future
+      } :+ Future.successful[Int](5)
       
       Await.result(Future.firstCompletedOf(futures), defaultTimeout) mustBe (5)
       Await.result(Future.firstCompletedOf(futures.iterator), defaultTimeout) mustBe (5)
@@ -186,21 +186,21 @@ object FutureTests extends MinimalScalaTest {
       val timeout = 10000 millis
       val f = new IllegalStateException("test")
       intercept[IllegalStateException] {
-        val failed = Promise.failed[String](f).future zip Promise.successful("foo").future
+        val failed = Future.failed[String](f) zip Future.successful("foo")
         Await.result(failed, timeout)
       } mustBe (f)
       
       intercept[IllegalStateException] {
-        val failed = Promise.successful("foo").future zip Promise.failed[String](f).future
+        val failed = Future.successful("foo") zip Future.failed[String](f)
         Await.result(failed, timeout)
       } mustBe (f)
       
       intercept[IllegalStateException] {
-        val failed = Promise.failed[String](f).future zip Promise.failed[String](f).future
+        val failed = Future.failed[String](f) zip Future.failed[String](f)
         Await.result(failed, timeout)
       } mustBe (f)
       
-      val successful = Promise.successful("foo").future zip Promise.successful("foo").future
+      val successful = Future.successful("foo") zip Future.successful("foo")
       Await.result(successful, timeout) mustBe (("foo", "foo"))
     }
     
