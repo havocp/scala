@@ -46,7 +46,7 @@ abstract class ConcurrentPackageObject {
    *  @param execctx  the execution context on which the future is run
    *  @return         the `Future` holding the result of the computation
    */
-  def future[T](body: =>T)(implicit execctx: ExecutionContext = defaultExecutionContext): Future[T] =
+  def future[T](body: =>T)(implicit execctx: ExecutionContext): Future[T] =
     Future[T](body)
 
   /** Creates a promise object which can be completed with a value.
@@ -55,7 +55,7 @@ abstract class ConcurrentPackageObject {
    *  @param execctx  the execution context on which the promise is created on
    *  @return         the newly created `Promise` object
    */
-  def promise[T]()(implicit execctx: ExecutionContext = defaultExecutionContext): Promise[T] =
+  def promise[T]()(implicit execctx: ExecutionContext): Promise[T] =
     Promise[T]()
 
   /** Used to block on a piece of code which potentially blocks.
