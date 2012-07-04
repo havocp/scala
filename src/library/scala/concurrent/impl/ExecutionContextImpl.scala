@@ -13,12 +13,12 @@ package scala.concurrent.impl
 import java.util.concurrent.{ Callable, Executor, ExecutorService, Executors, ThreadFactory, TimeUnit }
 import java.util.Collection
 import scala.concurrent.forkjoin._
-import scala.concurrent.{ ExecutionContext, Awaitable }
+import scala.concurrent.{ ExecutionContext, Awaitable, ExecutionContextExecutor, ExecutionContextExecutorService }
 import scala.concurrent.util.Duration
 
 
 
-private[scala] class ExecutionContextImpl private[impl] (es: Executor, reporter: Throwable => Unit) extends ExecutionContext with Executor {
+private[scala] class ExecutionContextImpl private[impl] (es: Executor, reporter: Throwable => Unit) extends ExecutionContextExecutor {
 
   val executor: Executor = es match {
     case null => createExecutorService
@@ -111,8 +111,8 @@ private[scala] class ExecutionContextImpl private[impl] (es: Executor, reporter:
 private[concurrent] object ExecutionContextImpl {
 
   def fromExecutor(e: Executor, reporter: Throwable => Unit = ExecutionContext.defaultReporter): ExecutionContextImpl = new ExecutionContextImpl(e, reporter)
-  def fromExecutorService(es: ExecutorService, reporter: Throwable => Unit = ExecutionContext.defaultReporter): ExecutionContextImpl with ExecutorService =
-    new ExecutionContextImpl(es, reporter) with ExecutorService {
+  def fromExecutorService(es: ExecutorService, reporter: Throwable => Unit = ExecutionContext.defaultReporter): ExecutionContextImpl with ExecutionContextExecutorService =
+    new ExecutionContextImpl(es, reporter) with ExecutionContextExecutorService {
       final def asExecutorService: ExecutorService = executor.asInstanceOf[ExecutorService]
       override def execute(command: Runnable) = executor.execute(command)
       override def shutdown() { asExecutorService.shutdown() }

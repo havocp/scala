@@ -38,29 +38,42 @@ trait ExecutionContext {
   
 }
 
+/**
+ * Union interface since Java does not support union types
+ */
+trait ExecutionContextExecutor extends ExecutionContext with Executor
+
+/**
+ * Union interface since Java does not support union types
+ */
+trait ExecutionContextExecutorService extends ExecutionContextExecutor with ExecutorService
+
 
 /** Contains factory methods for creating execution contexts.
  */
 object ExecutionContext {
-  
+
   implicit def defaultExecutionContext: ExecutionContext = scala.concurrent.defaultExecutionContext
-  
+    
   /** Creates an `ExecutionContext` from the given `ExecutorService`.
    */
-  def fromExecutorService(e: ExecutorService, reporter: Throwable => Unit = defaultReporter): ExecutionContext with ExecutorService =
+  def fromExecutorService(e: ExecutorService, reporter: Throwable => Unit): ExecutionContextExecutorService =
     impl.ExecutionContextImpl.fromExecutorService(e, reporter)
+
+  /** Creates an `ExecutionContext` from the given `ExecutorService` with the default Reporter.
+   */
+  def fromExecutorService(e: ExecutorService): ExecutionContextExecutorService = fromExecutorService(e, defaultReporter)
   
   /** Creates an `ExecutionContext` from the given `Executor`.
    */
-  def fromExecutor(e: Executor, reporter: Throwable => Unit = defaultReporter): ExecutionContext with Executor =
+  def fromExecutor(e: Executor, reporter: Throwable => Unit = defaultReporter): ExecutionContextExecutor =
     impl.ExecutionContextImpl.fromExecutor(e, reporter)
+
+ /** Creates an `ExecutionContext` from the given `Executor` with the default Reporter.
+   */
+  def fromExecutor(e: Executor): ExecutionContextExecutor = fromExecutor(e, defaultReporter)
   
-  def defaultReporter: Throwable => Unit = {
-    // re-throwing `Error`s here causes an exception handling test to fail.
-    //case e: Error => throw e
-    case t => t.printStackTrace()
-  }
-  
+  def defaultReporter: Throwable => Unit = { case t => t.printStackTrace() }
 }
 
 
