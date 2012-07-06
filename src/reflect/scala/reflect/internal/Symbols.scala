@@ -539,7 +539,6 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
     def isConcreteClass         = false
     def isImplClass             = false   // the implementation class of a trait
     def isJavaInterface         = false
-    def isModuleClass           = false
     def isNumericValueClass     = false
     def isPrimitiveValueClass   = false
     def isRefinementClass       = false
@@ -900,14 +899,11 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
       if (owner.isTerm) return false
       if (isLocalDummy) return false
 
+      if (isAliasType) return true
       if (isType && isNonClassType) return false
       if (isRefinementClass) return false
       return true
     }
-
-    // [Eugene] is it a good idea to add ``dealias'' to Symbol?
-    /** Expands type aliases */
-    def dealias: Symbol = this
 
     /** The variance of this symbol as an integer */
     final def variance: Int =
@@ -2564,7 +2560,6 @@ trait Symbols extends api.Symbols { self: SymbolTable =>
   extends TypeSymbol(initOwner, initPos, initName) {
     type TypeOfClonedSymbol = TypeSymbol
     final override def isAliasType = true
-    final override def dealias = info.typeSymbol.dealias
     override def cloneSymbolImpl(owner: Symbol, newFlags: Long): TypeSymbol =
       owner.newNonClassSymbol(name, pos, newFlags)
   }
