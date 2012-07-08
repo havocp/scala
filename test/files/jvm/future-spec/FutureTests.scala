@@ -10,11 +10,10 @@ import scala.runtime.NonLocalReturnControl
 
 
 object FutureTests extends MinimalScalaTest {
-  import ExecutionContext.Implicits._
 
   /* some utils */
   
-  def testAsync(s: String): Future[String] = s match {
+  def testAsync(s: String)(implicit ec: ExecutionContext): Future[String] = s match {
     case "Hello"   => future { "World" }
     case "Failure" => Future.failed(new RuntimeException("Expected exception; to test fault-tolerance"))
     case "NoReply" => Promise[String]().future
@@ -23,9 +22,57 @@ object FutureTests extends MinimalScalaTest {
   val defaultTimeout = 5 seconds
   
   /* future specification */
+
+  "A future with custom ExecutionContext" should {
+    "shouldHandleThrowables" in {
+      val ms = new mutable.HashSet[Throwable] with mutable.SynchronizedSet[Throwable]
+      implicit val ec = scala.concurrent.ExecutionContext.fromExecutor(new scala.concurrent.forkjoin.ForkJoinPool(), {
+        t =>
+        ms += t
+      })
+      
+      class ThrowableTest(m: String) extends Throwable(m)
+      
+      val f1 = future[Any] {
+        throw new ThrowableTest("test")
+      }
+      
+      intercept[ThrowableTest] {
+        Await.result(f1, defaultTimeout)
+      }
+      
+      val latch = new TestLatch
+      val f2 = future {
+        Await.ready(latch, 5 seconds)
+        "success"
+      }
+      val f3 = f2 map { s => s.toUpperCase }
+      
+      f2 foreach { _ => throw new ThrowableTest("dispatcher foreach") }
+      f2 onSuccess { case _ => throw new ThrowableTest("dispatcher receive") }
+      
+      latch.open()
+      
+      Await.result(f2, defaultTimeout) mustBe ("success")
+      
+      f2 foreach { _ => throw new ThrowableTest("current thread foreach") }
+      f2 onSuccess { case _ => throw new ThrowableTest("current thread receive") }
+      
+      Await.result(f3, defaultTimeout) mustBe ("SUCCESS")
+      
+      val waiting = future {
+        Thread.sleep(1000)
+      }
+      Await.ready(waiting, 2000 millis)
+      
+      ms.size mustBe (4)
+      //FIXME should check
+    }
+  }
   
-  "A future" should {
-    
+  "A future with global ExecutionContext" should {
+    import ExecutionContext.Implicits._
+
     "compose with for-comprehensions" in {
       def async(x: Int) = future { (x * 2).toString }
       val future0 = future[Any] {
@@ -336,50 +383,6 @@ object FutureTests extends MinimalScalaTest {
       val iterator = (1 to 100).toList.iterator
       val traversedIterator = Future.traverse(iterator)(x => Future(x * 2 - 1))
       Await.result(traversedIterator, defaultTimeout).sum mustBe (10000)
-    }
-    
-    "shouldHandleThrowables" in {
-      val ms = new mutable.HashSet[Throwable] with mutable.SynchronizedSet[Throwable]
-      implicit val ec = scala.concurrent.ExecutionContext.fromExecutor(new scala.concurrent.forkjoin.ForkJoinPool(), {
-        t =>
-        ms += t
-      })
-      
-      class ThrowableTest(m: String) extends Throwable(m)
-      
-      val f1 = future[Any] {
-        throw new ThrowableTest("test")
-      }
-      
-      intercept[ThrowableTest] {
-        Await.result(f1, defaultTimeout)
-      }
-      
-      val latch = new TestLatch
-      val f2 = future {
-        Await.ready(latch, 5 seconds)
-        "success"
-      }
-      val f3 = f2 map { s => s.toUpperCase }
-      
-      f2 foreach { _ => throw new ThrowableTest("dispatcher foreach") }
-      f2 onSuccess { case _ => throw new ThrowableTest("dispatcher receive") }
-      
-      latch.open()
-      
-      Await.result(f2, defaultTimeout) mustBe ("success")
-      
-      f2 foreach { _ => throw new ThrowableTest("current thread foreach") }
-      f2 onSuccess { case _ => throw new ThrowableTest("current thread receive") }
-      
-      Await.result(f3, defaultTimeout) mustBe ("SUCCESS")
-      
-      val waiting = future {
-        Thread.sleep(1000)
-      }
-      Await.ready(waiting, 2000 millis)
-      
-      ms.size mustBe (4)
     }
     
     "shouldBlockUntilResult" in {
