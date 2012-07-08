@@ -702,6 +702,64 @@ trait Blocking extends TestBase {
   
 }
 
+trait BlockContexts extends TestBase {
+
+  import scala.concurrent.{ Await, Awaitable, BlockContext }
+
+  private def getBlockContext(body: => BlockContext): BlockContext = {
+    blocking(Future { body }, Duration(500, "ms"))
+  }
+
+  // test outside of an ExecutionContext
+  def testDefaultOutsideFuture(): Unit = {
+    val bc = BlockContext.current
+    assert(bc.getClass.getName.contains("DefaultBlockContext"))
+  }
+
+  // test BlockContext in our default ExecutionContext
+  def testDefaultFJP(): Unit = {
+    val bc = getBlockContext(BlockContext.current)
+    assert(bc.isInstanceOf[scala.concurrent.forkjoin.ForkJoinWorkerThread])
+  }
+
+  // test BlockContext inside BlockContext.push
+  def testPushCustom(): Unit = {
+    val orig = BlockContext.current
+    val customBC = new BlockContext() {
+      override def internalBlockingCall[T](awaitable: Awaitable[T], atMost: Duration): T =
+        orig.internalBlockingCall(awaitable, atMost)
+    }
+
+    val bc = getBlockContext({
+      BlockContext.push(customBC) {
+        BlockContext.current
+      }
+    })
+
+    assert(bc eq customBC)
+  }
+
+  // test BlockContext after a BlockContext.push
+  def testPopCustom(): Unit = {
+    val orig = BlockContext.current
+    val customBC = new BlockContext() {
+      override def internalBlockingCall[T](awaitable: Awaitable[T], atMost: Duration): T =
+        orig.internalBlockingCall(awaitable, atMost)
+    }
+
+    val bc = getBlockContext({
+      BlockContext.push(customBC) {}
+      BlockContext.current
+    })
+
+    assert(bc ne customBC)
+  }
+
+  testDefaultOutsideFuture()
+  testDefaultFJP()
+  testPushCustom()
+  testPopCustom()
+}
 
 trait Promises extends TestBase {
 
@@ -931,6 +989,7 @@ with FutureCallbacks
 with FutureCombinators
 with FutureProjections
 with Promises
+with BlockContexts
 with Exceptions
 // with TryEitherExtractor
 with CustomExecutionContext

@@ -12,9 +12,10 @@ import java.lang.Thread
 import scala.concurrent.util.Duration
 
 /**
- * A context which can be notified by Future.blocking() when
- * a thread is about to block. This trait should be implemented
- * by the Thread.currentThread instance.
+ * A context which can be notified by `Future.blocking()` when
+ * a thread is about to block. This trait may be implemented
+ * by the `Thread.currentThread` instance or provided
+ * around a block of code using `BlockContext.push()`.
  */
 trait BlockContext {
 
@@ -26,7 +27,7 @@ trait BlockContext {
   def internalBlockingCall[T](awaitable: Awaitable[T], atMost: Duration): T
 }
 
-private object BlockContext {
+object BlockContext {
   private class DefaultBlockContext extends BlockContext {
     override def internalBlockingCall[T](awaitable: Awaitable[T], atMost: Duration): T =
       awaitable.result(atMost)(Await.canAwaitEvidence)
@@ -34,10 +35,27 @@ private object BlockContext {
 
   private lazy val fallback = new DefaultBlockContext()
 
-  def current: BlockContext = {
-    Thread.currentThread match {
-      case ctx: BlockContext => ctx
-      case _ =>                 fallback
+  private val contextLocal = new ThreadLocal[List[BlockContext]]() {
+    override def initialValue = {
+      List(Thread.currentThread match {
+        case ctx: BlockContext => ctx
+        case _ =>                 fallback
+      })
+    }
+  }
+
+  /** Obtain the current thread's current `BlockContext` */
+  def current: BlockContext =
+    contextLocal.get.head
+
+  /** Pushes a current `BlockContext` while executing `body`. */
+  def push[T](blockContext: BlockContext)(body: => T): T = {
+    val oldList = contextLocal.get
+    try {
+      contextLocal.set(blockContext :: oldList)
+      body
+    } finally {
+      contextLocal.set(oldList)
     }
   }
 }
