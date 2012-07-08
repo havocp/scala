@@ -46,6 +46,14 @@ private[concurrent] object Future {
   
   def boxedType(c: Class[_]): Class[_] = if (c.isPrimitive) toBoxed(c) else c
 
+  // TODO rename appropriately and make public
+  private[concurrent] def isFutureThrowable(t: Throwable) = t match {
+    case e: Error                               => false
+    case t: scala.util.control.ControlThrowable => false
+    case i: InterruptedException                => false
+    case _                                      => true
+  }
+
   private[impl] class PromiseCompletingTask[T](override val executor: ExecutionContext, body: => T)
     extends Task {
     val promise = new Promise.DefaultPromise[T]()
@@ -94,8 +102,10 @@ private[concurrent] object Future {
         _taskStack set taskStack
         while (taskStack.stack.nonEmpty) {
           val next = taskStack.stack.pop()
-          require(next.executor eq executor)
-          try next.task() catch { case NonFatal(e) => executor reportFailure e }
+          try {
+            require(next.executor eq executor)
+            next.task()
+          } catch { case NonFatal(e) => executor reportFailure e }
         }
       } finally {
         _taskStack.remove()
@@ -111,30 +121,28 @@ private[concurrent] object Future {
       }
   }
 
-  private[impl] class ReleaseTask(override val executor: ExecutionContext, val elems: List[Task])
-    extends Task {
-    protected override def task() = {
-      _taskStack.get.stack.elems = elems
+  private[impl] class ReleaseTask(override val executor: ExecutionContext, val elems: List[Task]) extends Task {
+    protected override def task(): Unit = _taskStack.get match {
+      case null => executor.reportFailure(new NullPointerException("taskStack is null"))
+      case taskStack => taskStack.stack.elems ++= elems
     }
   }
 
-  private[impl] def releaseStack(executor: ExecutionContext): Unit =
+  private[impl] def releaseStack(): Unit =
     _taskStack.get match {
-      case stack if (stack ne null) && stack.stack.nonEmpty =>
+      case null => // do nothing - there is no local batching stack anymore
+      case stack =>
+        _taskStack.remove()
         val tasks = stack.stack.elems
-        stack.stack.clear()
-        _taskStack.remove()
-        val release = new ReleaseTask(executor, tasks)
-        release.dispatch(force=true)
-      case null =>
-        // do nothing - there is no local batching stack anymore
-      case _ =>
-        _taskStack.remove()
+        if (tasks.nonEmpty) {
+          stack.stack.clear()
+          (new ReleaseTask(stack.executor, tasks)).dispatch(force = true)
+        }
     }
 
   private[impl] class OnCompleteTask[T](override val executor: ExecutionContext, val onComplete: (Either[Throwable, T]) => Any)
     extends Task {
-    private var value: Either[Throwable, T] = null
+    private[this] var value: Either[Throwable, T] = null
 
     protected override def task() = {
       require(value ne null) // dispatch(value) must be called before dispatch()

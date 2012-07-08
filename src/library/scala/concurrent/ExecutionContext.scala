@@ -9,16 +9,14 @@
 package scala.concurrent
 
 
-
-import java.util.concurrent.atomic.{ AtomicInteger }
-import java.util.concurrent.{ Executors, Future => JFuture, Callable, ExecutorService, Executor }
+import java.util.concurrent.{ ExecutorService, Executor }
 import scala.concurrent.util.Duration
-import scala.concurrent.forkjoin.{ ForkJoinPool, RecursiveTask => FJTask, RecursiveAction, ForkJoinWorkerThread }
-import scala.collection.generic.CanBuildFrom
-import collection._
+import scala.annotation.implicitNotFound
 
-
-
+/**
+ * An `ExecutionContext` is an abstraction over an entity that can execute program logic.
+ */
+@implicitNotFound("Cannot find an implicit ExecutionContext, either require one yourself or import ExecutionContext.Implicit.global")
 trait ExecutionContext {
   
   /** Runs a block of code on this execution context.
@@ -52,8 +50,24 @@ trait ExecutionContextExecutorService extends ExecutionContextExecutor with Exec
 /** Contains factory methods for creating execution contexts.
  */
 object ExecutionContext {
+  /**
+   * The `ExecutionContext` associated with the current `Thread`
+   */
+  val currentExecutionContext: ThreadLocal[ExecutionContext] = new ThreadLocal //FIXME might want to set the initial value to an executionContext that throws an exception on execute and warns that it's not set
 
-  implicit def defaultExecutionContext: ExecutionContext = scala.concurrent.defaultExecutionContext
+  /**
+   * This is the explicit global ExecutionContext,
+   * call this when you want to provide the global ExecutionContext explicitly
+   */
+  def global: ExecutionContextExecutor = Implicit.global
+
+  object Implicit {
+    /**
+     * This is the implicit global ExecutionContext,
+     * import this when you want to provide the global ExecutionContext implicitly
+     */
+    implicit lazy val global: ExecutionContextExecutor = impl.ExecutionContextImpl.fromExecutor(null: Executor)
+  }
     
   /** Creates an `ExecutionContext` from the given `ExecutorService`.
    */
@@ -69,10 +83,12 @@ object ExecutionContext {
   def fromExecutor(e: Executor, reporter: Throwable => Unit = defaultReporter): ExecutionContextExecutor =
     impl.ExecutionContextImpl.fromExecutor(e, reporter)
 
- /** Creates an `ExecutionContext` from the given `Executor` with the default Reporter.
+  /** Creates an `ExecutionContext` from the given `Executor` with the default Reporter.
    */
   def fromExecutor(e: Executor): ExecutionContextExecutor = fromExecutor(e, defaultReporter)
   
+  /** The default reporter simply prints the stack trace of the `Throwable` to System.err.
+   */
   def defaultReporter: Throwable => Unit = { case t => t.printStackTrace() }
 }
 

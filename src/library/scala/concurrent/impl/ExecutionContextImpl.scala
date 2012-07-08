@@ -30,7 +30,7 @@ private[scala] class ExecutionContextImpl private[impl] (es: Executor, reporter:
   def executorsThreadFactory = new ThreadFactory {
     def newThread(r: Runnable) = new Thread(new Runnable {
       override def run() {
-        scala.concurrent.currentExecutionContext.set(ExecutionContextImpl.this)
+        ExecutionContext.currentExecutionContext.set(ExecutionContextImpl.this)
         r.run()
       }
     })
@@ -40,7 +40,7 @@ private[scala] class ExecutionContextImpl private[impl] (es: Executor, reporter:
   def forkJoinPoolThreadFactory = new ForkJoinPool.ForkJoinWorkerThreadFactory {
     def newThread(fjp: ForkJoinPool) = new ForkJoinWorkerThread(fjp) {
       override def onStart() {
-        scala.concurrent.currentExecutionContext.set(ExecutionContextImpl.this)
+        ExecutionContext.currentExecutionContext.set(ExecutionContextImpl.this)
       }
     }
   }
@@ -85,7 +85,7 @@ private[scala] class ExecutionContextImpl private[impl] (es: Executor, reporter:
   }
 
   def internalBlockingCall[T](awaitable: Awaitable[T], atMost: Duration): T = {
-    Future.releaseStack(this)
+    Future.releaseStack()
     
     executor match {
       case fj: ForkJoinPool =>
