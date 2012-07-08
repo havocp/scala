@@ -13,7 +13,7 @@ package scala.concurrent.impl
 import java.util.concurrent.{ Callable, Executor, ExecutorService, Executors, ThreadFactory, TimeUnit }
 import java.util.Collection
 import scala.concurrent.forkjoin._
-import scala.concurrent.{ ExecutionContext, Awaitable, ExecutionContextExecutor, ExecutionContextExecutorService }
+import scala.concurrent.{ BlockContext, ExecutionContext, Awaitable, ExecutionContextExecutor, ExecutionContextExecutorService }
 import scala.concurrent.util.Duration
 import scala.util.control.NonFatal
 
@@ -25,22 +25,22 @@ private[scala] class ExecutionContextImpl private[impl] (es: Executor, reporter:
     case null => createExecutorService
     case some => some
   }
-  
-  // to ensure that the current execution context thread local is properly set
-  def executorsThreadFactory = new ThreadFactory {
-    def newThread(r: Runnable) = new Thread(new Runnable {
-      override def run() {
-        scala.concurrent.currentExecutionContext.set(ExecutionContextImpl.this)
-        r.run()
-      }
-    })
-  }
-  
-  // to ensure that the current execution context thread local is properly set
+
+  // Implement BlockContext on FJP threads
   def forkJoinPoolThreadFactory = new ForkJoinPool.ForkJoinWorkerThreadFactory {
-    def newThread(fjp: ForkJoinPool) = new ForkJoinWorkerThread(fjp) {
-      override def onStart() {
-        scala.concurrent.currentExecutionContext.set(ExecutionContextImpl.this)
+    def newThread(fjp: ForkJoinPool) = new ForkJoinWorkerThread(fjp) with BlockContext {
+      override def internalBlockingCall[T](awaitable: Awaitable[T], atMost: Duration): T = {
+        var result: T = null.asInstanceOf[T]
+        ForkJoinPool.managedBlock(new ForkJoinPool.ManagedBlocker {
+          @volatile var isdone = false
+          def block(): Boolean = {
+            result = awaitable.result(atMost)(scala.concurrent.Await.canAwaitEvidence) // FIXME what happens if there's an exception thrown here?
+            isdone = true
+            true
+          }
+          def isReleasable = isdone
+        })
+        result
       }
     }
   }
@@ -68,7 +68,7 @@ private[scala] class ExecutionContextImpl private[impl] (es: Executor, reporter:
     case NonFatal(t) =>
       System.err.println("Failed to create ForkJoinPool for the default ExecutionContext, falling back to Executors.newCachedThreadPool")
       t.printStackTrace(System.err)
-      Executors.newCachedThreadPool(executorsThreadFactory) //FIXME use the same desired parallelism here too?
+      Executors.newCachedThreadPool() //FIXME use the same desired parallelism here too?
   }
 
   def execute(runnable: Runnable): Unit = executor match {
@@ -82,25 +82,6 @@ private[scala] class ExecutionContextImpl private[impl] (es: Executor, reporter:
         case _ => fj.execute(runnable)
       }
     case generic => generic execute runnable
-  }
-
-  def internalBlockingCall[T](awaitable: Awaitable[T], atMost: Duration): T = {
-    executor match {
-      case fj: ForkJoinPool =>
-        var result: T = null.asInstanceOf[T]
-        ForkJoinPool.managedBlock(new ForkJoinPool.ManagedBlocker { 
-          @volatile var isdone = false
-          def block(): Boolean = {
-            result = awaitable.result(atMost)(scala.concurrent.Await.canAwaitEvidence) // FIXME what happens if there's an exception thrown here?
-            isdone = true
-            true
-          }
-          def isReleasable = isdone
-        })
-        result
-      case _ =>
-        awaitable.result(atMost)(scala.concurrent.Await.canAwaitEvidence)
-    }
   }
 
   def reportFailure(t: Throwable) = reporter(t)

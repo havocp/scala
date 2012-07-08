@@ -25,13 +25,6 @@ trait ExecutionContext {
    */
   def execute(runnable: Runnable): Unit
   
-  /** Used internally by the framework - blocks execution for at most `atMost` time while waiting
-   *  for an `awaitable` object to become ready.
-   *  
-   *  Clients should use `scala.concurrent.blocking` instead.
-   */
-  def internalBlockingCall[T](awaitable: Awaitable[T], atMost: Duration): T
-  
   /** Reports that an asynchronous computation failed.
    */
   def reportFailure(t: Throwable): Unit

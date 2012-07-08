@@ -843,9 +843,6 @@ trait CustomExecutionContext extends TestBase {
       delegate.execute(wrapper)
     }
 
-    override def internalBlockingCall[T](awaitable: Awaitable[T], atMost: Duration): T =
-      delegate.internalBlockingCall(awaitable, atMost)
-
     override def reportFailure(t: Throwable): Unit = {
       System.err.println("Failure: " + t.getClass.getSimpleName + ": " + t.getMessage)
       delegate.reportFailure(t)
