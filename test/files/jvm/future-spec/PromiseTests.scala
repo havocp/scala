@@ -10,7 +10,8 @@ import scala.runtime.NonLocalReturnControl
 
 
 object PromiseTests extends MinimalScalaTest {
-  
+  import ExecutionContext.Implicits._
+
   val defaultTimeout = Inf
   
   /* promise specification */

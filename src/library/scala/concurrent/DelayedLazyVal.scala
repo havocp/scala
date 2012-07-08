@@ -40,7 +40,7 @@ class DelayedLazyVal[T](f: () => T, body: => Unit){
   def apply(): T = if (isDone) complete else f()
 
   // FIXME need to take ExecutionContext in constructor
-  import ExecutionContext.Implicit._
+  import ExecutionContext.Implicits.global
   future {
     body
     _isDone = true

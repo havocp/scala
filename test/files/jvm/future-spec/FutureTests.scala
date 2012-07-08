@@ -10,7 +10,8 @@ import scala.runtime.NonLocalReturnControl
 
 
 object FutureTests extends MinimalScalaTest {
-  
+  import ExecutionContext.Implicits._
+
   /* some utils */
   
   def testAsync(s: String): Future[String] = s match {

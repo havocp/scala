@@ -16,7 +16,7 @@ import scala.annotation.implicitNotFound
 /**
  * An `ExecutionContext` is an abstraction over an entity that can execute program logic.
  */
-@implicitNotFound("Cannot find an implicit ExecutionContext, either require one yourself or import ExecutionContext.Implicit.global")
+@implicitNotFound("Cannot find an implicit ExecutionContext, either require one yourself or import ExecutionContext.Implicits.global")
 trait ExecutionContext {
   
   /** Runs a block of code on this execution context.
@@ -59,9 +59,9 @@ object ExecutionContext {
    * This is the explicit global ExecutionContext,
    * call this when you want to provide the global ExecutionContext explicitly
    */
-  def global: ExecutionContextExecutor = Implicit.global
+  def global: ExecutionContextExecutor = Implicits.global
 
-  object Implicit {
+  object Implicits {
     /**
      * This is the implicit global ExecutionContext,
      * import this when you want to provide the global ExecutionContext implicitly
@@ -80,7 +80,7 @@ object ExecutionContext {
   
   /** Creates an `ExecutionContext` from the given `Executor`.
    */
-  def fromExecutor(e: Executor, reporter: Throwable => Unit = defaultReporter): ExecutionContextExecutor =
+  def fromExecutor(e: Executor, reporter: Throwable => Unit): ExecutionContextExecutor =
     impl.ExecutionContextImpl.fromExecutor(e, reporter)
 
   /** Creates an `ExecutionContext` from the given `Executor` with the default Reporter.

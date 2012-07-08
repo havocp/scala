@@ -3,13 +3,11 @@ import scala.concurrent.{
   Promise,
   TimeoutException,
   SyncVar,
-  ExecutionException
+  ExecutionException,
+  ExecutionContext
 }
-import scala.concurrent.future
-import scala.concurrent.promise
-import scala.concurrent.blocking
+import scala.concurrent.{ future, promise, blocking }
 import scala.util.{ Try, Success, Failure }
-
 import scala.concurrent.util.Duration
 
 
@@ -33,7 +31,8 @@ trait TestBase {
 
 
 trait FutureCallbacks extends TestBase {
-  
+  import ExecutionContext.Implicits._
+
   def testOnSuccess(): Unit = once {
     done =>
     var x = 0
@@ -147,6 +146,7 @@ trait FutureCallbacks extends TestBase {
 
 
 trait FutureCombinators extends TestBase {
+  import ExecutionContext.Implicits._
 
   def testMapSuccess(): Unit = once {
     done =>
@@ -591,7 +591,8 @@ trait FutureCombinators extends TestBase {
 
 
 trait FutureProjections extends TestBase {
-  
+  import ExecutionContext.Implicits._
+
   def testFailedFailureOnComplete(): Unit = once {
     done =>
     val cause = new RuntimeException
@@ -673,7 +674,8 @@ trait FutureProjections extends TestBase {
 
 
 trait Blocking extends TestBase {
-  
+  import ExecutionContext.Implicits._
+
   def testAwaitSuccess(): Unit = once {
     done =>
     val f = future { 0 }
@@ -704,6 +706,7 @@ trait Blocking extends TestBase {
 
 
 trait Promises extends TestBase {
+  import ExecutionContext.Implicits._
 
   def testSuccess(): Unit = once {
     done =>
@@ -730,7 +733,8 @@ trait Promises extends TestBase {
 
 
 trait Exceptions extends TestBase {
-  
+  import ExecutionContext.Implicits._
+
 }
 
 // trait TryEitherExtractor extends TestBase {
@@ -811,7 +815,7 @@ trait Exceptions extends TestBase {
 trait CustomExecutionContext extends TestBase {
   import scala.concurrent.{ ExecutionContext, Awaitable }
 
-  def defaultEC = ExecutionContext.defaultExecutionContext
+  def defaultEC = ExecutionContext.global
 
   val inEC = new java.lang.ThreadLocal[Int]() {
     override def initialValue = 0
@@ -826,7 +830,7 @@ trait CustomExecutionContext extends TestBase {
     val _count = new java.util.concurrent.atomic.AtomicInteger(0)
     def count = _count.get
 
-    def delegate = ExecutionContext.defaultExecutionContext
+    def delegate = ExecutionContext.global
 
     override def execute(runnable: Runnable) = {
       _count.incrementAndGet()
