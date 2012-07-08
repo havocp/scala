@@ -85,8 +85,6 @@ private[scala] class ExecutionContextImpl private[impl] (es: Executor, reporter:
   }
 
   def internalBlockingCall[T](awaitable: Awaitable[T], atMost: Duration): T = {
-    Future.releaseStack(this)
-    
     executor match {
       case fj: ForkJoinPool =>
         var result: T = null.asInstanceOf[T]

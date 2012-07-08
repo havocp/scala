@@ -90,14 +90,30 @@ object Promise {
       case _               => false
     }
 
+    private class ListenerRunnable[T](val executor: ExecutionContext, val onComplete: (Either[Throwable, T]) => Any) extends Runnable {
+      // must be filled in before running it
+      var value: Either[Throwable, T] = null
+
+      override def run() = {
+        require(value ne null) // must set value to non-null before running!
+        onComplete(value)
+      }
+
+      def executeWithValue(v: Either[Throwable, T]): Unit = {
+        require(value eq null) // can't complete it twice
+        value = v
+        executor.execute(this)
+      }
+    }
+
     def tryComplete(value: Either[Throwable, T]): Boolean = {
       val resolved = resolveEither(value)
       (try {
         @tailrec
-        def tryComplete(v: Either[Throwable, T]): List[Future.OnCompleteTask[T]] = {
+        def tryComplete(v: Either[Throwable, T]): List[ListenerRunnable[T]] = {
           getState match {
             case raw: List[_] =>
-              val cur = raw.asInstanceOf[List[Future.OnCompleteTask[T]]]
+              val cur = raw.asInstanceOf[List[ListenerRunnable[T]]]
               if (updateState(cur, v)) cur else tryComplete(v)
             case _ => null
           }
@@ -107,19 +123,19 @@ object Promise {
         synchronized { notifyAll() } //Notify any evil blockers
       }) match {
         case null             => false
-        case cs if cs.isEmpty => true
-        case cs               => cs.foreach(c => c.dispatch(resolved)); true
+        case rs if rs.isEmpty => true
+        case rs               => rs.foreach(r => r.executeWithValue(resolved)); true
       }
     }
 
     def onComplete[U](func: Either[Throwable, T] => U)(implicit executor: ExecutionContext): Unit = {
-      val bound = new Future.OnCompleteTask[T](executor, func)
+      val runnable = new ListenerRunnable[T](executor, func)
 
       @tailrec //Tries to add the callback, if already completed, it dispatches the callback to be executed
       def dispatchOrAddCallback(): Unit =
         getState match {
-          case r: Either[_, _]    => bound.dispatch(r.asInstanceOf[Either[Throwable, T]])
-          case listeners: List[_] => if (updateState(listeners, bound :: listeners)) () else dispatchOrAddCallback()
+          case r: Either[_, _]    => runnable.executeWithValue(r.asInstanceOf[Either[Throwable, T]])
+          case listeners: List[_] => if (updateState(listeners, runnable :: listeners)) () else dispatchOrAddCallback()
         }
       dispatchOrAddCallback()
     }
@@ -139,7 +155,9 @@ object Promise {
 
     def onComplete[U](func: Either[Throwable, T] => U)(implicit executor: ExecutionContext): Unit = {
       val completedAs = value.get
-      (new Future.OnCompleteTask(executor, func)).dispatch(completedAs)
+      executor.execute(new Runnable() {
+        override def run(): Unit = func(completedAs)
+      })
     }
 
     def ready(atMost: Duration)(implicit permit: CanAwait): this.type = this
