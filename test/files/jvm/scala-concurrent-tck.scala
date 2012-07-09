@@ -918,14 +918,16 @@ trait CustomExecutionContext extends TestBase {
 
   def testOnSuccessCustomEC(): Unit = {
     val count = countExecs { implicit ec =>
-      once { done =>
-        val f = future({ assertNoEC() })(defaultEC)
-        f onSuccess {
-          case _ =>
-            assertEC()
+      blocking {
+        once { done =>
+          val f = future({ assertNoEC() })(defaultEC)
+          f onSuccess {
+            case _ =>
+              assertEC()
             done()
+          }
+          assertNoEC()
         }
-        assertNoEC()
       }
     }
 
@@ -935,12 +937,14 @@ trait CustomExecutionContext extends TestBase {
 
   def testKeptPromiseCustomEC(): Unit = {
     val count = countExecs { implicit ec =>
-      once { done =>
-        val f = Promise.successful(10).future
-        f onSuccess {
-          case _ =>
-            assertEC()
+      blocking {
+        once { done =>
+          val f = Promise.successful(10).future
+          f onSuccess {
+            case _ =>
+              assertEC()
             done()
+          }
         }
       }
     }
@@ -951,28 +955,30 @@ trait CustomExecutionContext extends TestBase {
 
   def testCallbackChainCustomEC(): Unit = {
     val count = countExecs { implicit ec =>
-      once { done =>
-        assertNoEC()
-        val addOne = { x: Int => assertEC(); x + 1 }
-        val f = Promise.successful(10).future
-        f.map(addOne).filter { x =>
-           assertEC()
-           x == 11
-         } flatMap { x =>
-           Promise.successful(x + 1).future.map(addOne).map(addOne)
-         } onComplete {
-          case Left(t) =>
-            try {
-              throw new AssertionError("error in test: " + t.getMessage, t)
-            } finally {
+      blocking {
+        once { done =>
+          assertNoEC()
+          val addOne = { x: Int => assertEC(); x + 1 }
+          val f = Promise.successful(10).future
+          f.map(addOne).filter { x =>
+             assertEC()
+             x == 11
+           } flatMap { x =>
+             Promise.successful(x + 1).future.map(addOne).map(addOne)
+           } onComplete {
+            case Left(t) =>
+              try {
+                throw new AssertionError("error in test: " + t.getMessage, t)
+              } finally {
+                done()
+              }
+            case Right(x) =>
+              assertEC()
+              assert(x == 14)
               done()
-            }
-          case Right(x) =>
-            assertEC()
-            assert(x == 14)
-            done()
+          }
+          assertNoEC()
         }
-        assertNoEC()
       }
     }
 
