@@ -1,6 +1,5 @@
 import scala.util.control.NonFatal
 
-// tests the basic combinators on Try
 trait NonFatalTests {
 
 	//NonFatals
