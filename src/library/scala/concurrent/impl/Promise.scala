@@ -11,7 +11,7 @@ package scala.concurrent.impl
 
 
 import java.util.concurrent.TimeUnit.{ NANOSECONDS, MILLISECONDS }
-import scala.concurrent.{ Awaitable, ExecutionContext, blocking, CanAwait, TimeoutException, ExecutionException }
+import scala.concurrent.{ Awaitable, ExecutionContext, blocking, CanAwait, OnCompleteRunnable, TimeoutException, ExecutionException }
 //import scala.util.continuations._
 import scala.concurrent.util.Duration
 import scala.util
@@ -24,7 +24,7 @@ private[concurrent] trait Promise[T] extends scala.concurrent.Promise[T] with Fu
   def future: this.type = this
 }
 
-private class CallbackRunnable[T](val executor: ExecutionContext, val onComplete: (Either[Throwable, T]) => Any) extends Runnable {
+private class CallbackRunnable[T](val executor: ExecutionContext, val onComplete: (Either[Throwable, T]) => Any) extends Runnable with OnCompleteRunnable {
   // must be filled in before running it
   var value: Either[Throwable, T] = null
 
