@@ -4,49 +4,35 @@ import scala.util.control.NonFatal
 trait NonFatalTests {
 
 	//NonFatals
-    val SO: Throwable = new StackOverflowError
-    val RE: Throwable = new RuntimeException
-    val E: Throwable = new Exception
-    val T: Throwable = new Throwable
+    val nonFatals: Seq[Throwable] =
+      Seq(new StackOverflowError,
+          new RuntimeException,
+          new Exception,
+          new Throwable)
     
     //Fatals
-    val Interrupted: Throwable = new InterruptedException
-    val OOME: Throwable = new OutOfMemoryError
-    val LinkError: Throwable = new LinkageError
-    val VME: Throwable = new VirtualMachineError {}
-    val Control: Throwable = new Throwable with scala.util.control.ControlThrowable
-    val NIE: Throwable = new NotImplementedError
+    val fatals: Seq[Throwable] =
+      Seq(new InterruptedException,
+          new OutOfMemoryError,
+          new LinkageError,
+          new VirtualMachineError {},
+          new Throwable with scala.util.control.ControlThrowable,
+          new NotImplementedError)
 
 	def testFatalsUsingApply(): Unit = {
-       assert(!NonFatal(OOME))
-       assert(!NonFatal(Interrupted))
-       assert(!NonFatal(LinkError))
-       assert(!NonFatal(VME))
-       assert(!NonFatal(Control))
-       assert(!NonFatal(NIE))
+	   fatals foreach { t => assert(NonFatal(t) == false) }
 	}
 
 	def testNonFatalsUsingApply(): Unit = {
-       assert(NonFatal(SO))
-       assert(NonFatal(RE))
-       assert(NonFatal(E))
-       assert(NonFatal(T))
+       nonFatals foreach { t => assert(NonFatal(t) == true) }
 	}
 
 	def testFatalsUsingUnapply(): Unit = {
-       assert(NonFatal.unapply(OOME).isEmpty)
-       assert(NonFatal.unapply(Interrupted).isEmpty)
-       assert(NonFatal.unapply(LinkError).isEmpty)
-       assert(NonFatal.unapply(VME).isEmpty)
-       assert(NonFatal.unapply(Control).isEmpty)
-       assert(NonFatal.unapply(NIE).isEmpty)
+      fatals foreach { t => assert(NonFatal.unapply(t).isEmpty) }
 	}
 
 	def testNonFatalsUsingUnapply(): Unit = {
-       assert(NonFatal.unapply(SO).isDefined)
-       assert(NonFatal.unapply(RE).isDefined)
-       assert(NonFatal.unapply(E).isDefined)
-       assert(NonFatal.unapply(T).isDefined)
+       nonFatals foreach { t => assert(NonFatal.unapply(t).isDefined) }
 	}
 
 	testFatalsUsingApply()
