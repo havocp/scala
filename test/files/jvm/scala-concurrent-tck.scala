@@ -9,7 +9,6 @@ import scala.concurrent.{
 import scala.concurrent.{ future, promise, blocking }
 import scala.util.{ Try, Success, Failure }
 import scala.concurrent.util.Duration
-import ExecutionContext.Implicits._
 
 trait TestBase {
   
@@ -705,7 +704,7 @@ trait Blocking extends TestBase {
 }
 
 trait BlockContexts extends TestBase {
-
+  import ExecutionContext.Implicits._
   import scala.concurrent.{ Await, Awaitable, BlockContext }
 
   private def getBlockContext(body: => BlockContext): BlockContext = {
