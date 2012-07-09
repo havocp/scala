@@ -33,27 +33,24 @@ object BlockContext {
       awaitable.result(atMost)(Await.canAwaitEvidence)
   }
 
-  private val contextLocal = new ThreadLocal[List[BlockContext]]() {
-    override def initialValue = {
-      List(Thread.currentThread match {
-        case ctx: BlockContext => ctx
-        case _ => DefaultBlockContext
-      })
+  private val contextLocal = new ThreadLocal[BlockContext]() {
+    override def initialValue = Thread.currentThread match {
+      case ctx: BlockContext => ctx
+      case _ => DefaultBlockContext
     }
   }
 
   /** Obtain the current thread's current `BlockContext` */
-  def current: BlockContext =
-    contextLocal.get.head
+  def current: BlockContext = contextLocal.get
 
   /** Pushes a current `BlockContext` while executing `body`. */
   def push[T](blockContext: BlockContext)(body: => T): T = {
-    val oldList = contextLocal.get
+    val old = contextLocal.get
     try {
-      contextLocal.set(blockContext :: oldList)
+      contextLocal.set(blockContext)
       body
     } finally {
-      contextLocal.set(oldList)
+      contextLocal.set(old)
     }
   }
 }
