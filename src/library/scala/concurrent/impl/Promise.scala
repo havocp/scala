@@ -24,6 +24,21 @@ private[concurrent] trait Promise[T] extends scala.concurrent.Promise[T] with Fu
   def future: this.type = this
 }
 
+private class CallbackRunnable[T](val executor: ExecutionContext, val onComplete: (Either[Throwable, T]) => Any) extends Runnable {
+  // must be filled in before running it
+  var value: Either[Throwable, T] = null
+
+  override def run() = {
+    require(value ne null) // must set value to non-null before running!
+    onComplete(value)
+  }
+
+  def executeWithValue(v: Either[Throwable, T]): Unit = {
+    require(value eq null) // can't complete it twice
+    value = v
+    executor.execute(this)
+  }
+}
 
 object Promise {
 
@@ -90,30 +105,14 @@ object Promise {
       case _               => false
     }
 
-    private class ListenerRunnable[T](val executor: ExecutionContext, val onComplete: (Either[Throwable, T]) => Any) extends Runnable {
-      // must be filled in before running it
-      var value: Either[Throwable, T] = null
-
-      override def run() = {
-        require(value ne null) // must set value to non-null before running!
-        onComplete(value)
-      }
-
-      def executeWithValue(v: Either[Throwable, T]): Unit = {
-        require(value eq null) // can't complete it twice
-        value = v
-        executor.execute(this)
-      }
-    }
-
     def tryComplete(value: Either[Throwable, T]): Boolean = {
       val resolved = resolveEither(value)
       (try {
         @tailrec
-        def tryComplete(v: Either[Throwable, T]): List[ListenerRunnable[T]] = {
+        def tryComplete(v: Either[Throwable, T]): List[CallbackRunnable[T]] = {
           getState match {
             case raw: List[_] =>
-              val cur = raw.asInstanceOf[List[ListenerRunnable[T]]]
+              val cur = raw.asInstanceOf[List[CallbackRunnable[T]]]
               if (updateState(cur, v)) cur else tryComplete(v)
             case _ => null
           }
@@ -129,7 +128,7 @@ object Promise {
     }
 
     def onComplete[U](func: Either[Throwable, T] => U)(implicit executor: ExecutionContext): Unit = {
-      val runnable = new ListenerRunnable[T](executor, func)
+      val runnable = new CallbackRunnable[T](executor, func)
 
       @tailrec //Tries to add the callback, if already completed, it dispatches the callback to be executed
       def dispatchOrAddCallback(): Unit =
@@ -155,9 +154,7 @@ object Promise {
 
     def onComplete[U](func: Either[Throwable, T] => U)(implicit executor: ExecutionContext): Unit = {
       val completedAs = value.get
-      executor.execute(new Runnable() {
-        override def run(): Unit = func(completedAs)
-      })
+      (new CallbackRunnable(executor, func)).executeWithValue(completedAs)
     }
 
     def ready(atMost: Duration)(implicit permit: CanAwait): this.type = this
