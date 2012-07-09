@@ -16,7 +16,7 @@ trait TestBase {
   def once(body: (() => Unit) => Unit) {
     val sv = new SyncVar[Boolean]
     body(() => sv put true)
-    sv.take()
+    sv.take(2000)
   }
   
   // def assert(cond: => Boolean) {
