@@ -9,7 +9,7 @@ import scala.concurrent.{
 import scala.concurrent.{ future, promise, blocking }
 import scala.util.{ Try, Success, Failure }
 import scala.concurrent.util.Duration
-
+import ExecutionContext.Implicits._
 
 trait TestBase {
   
