@@ -18,14 +18,6 @@ import language.implicitConversions
  */
 abstract class ConcurrentPackageObject {
 
-  // TODO rename appropriately and make public
-  private[concurrent] def isFutureThrowable(t: Throwable) = t match {
-    case e: Error                               => false
-    case t: scala.util.control.ControlThrowable => false
-    case i: InterruptedException                => false
-    case _                                      => true
-  }
-
   /* concurrency constructs */
 
   /** Starts an asynchronous computation and returns a `Future` object with the result of that computation.
