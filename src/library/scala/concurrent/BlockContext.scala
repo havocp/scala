@@ -28,18 +28,16 @@ trait BlockContext {
 }
 
 object BlockContext {
-  private class DefaultBlockContext extends BlockContext {
+  private object DefaultBlockContext extends BlockContext {
     override def internalBlockingCall[T](awaitable: Awaitable[T], atMost: Duration): T =
       awaitable.result(atMost)(Await.canAwaitEvidence)
   }
-
-  private lazy val fallback = new DefaultBlockContext()
 
   private val contextLocal = new ThreadLocal[List[BlockContext]]() {
     override def initialValue = {
       List(Thread.currentThread match {
         case ctx: BlockContext => ctx
-        case _ =>                 fallback
+        case _ => DefaultBlockContext
       })
     }
   }
