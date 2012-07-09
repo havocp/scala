@@ -16,6 +16,7 @@ import scala.concurrent.{ Awaitable, ExecutionContext, blocking, CanAwait, OnCom
 import scala.concurrent.util.Duration
 import scala.util
 import scala.annotation.tailrec
+import scala.util.control.NonFatal
 //import scala.concurrent.NonDeterministic
 
 
@@ -30,7 +31,7 @@ private class CallbackRunnable[T](val executor: ExecutionContext, val onComplete
 
   override def run() = {
     require(value ne null) // must set value to non-null before running!
-    onComplete(value)
+    try onComplete(value) catch { case NonFatal(e) => executor reportFailure e }
   }
 
   def executeWithValue(v: Either[Throwable, T]): Unit = {
