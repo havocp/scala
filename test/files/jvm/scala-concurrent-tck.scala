@@ -4,7 +4,8 @@ import scala.concurrent.{
   TimeoutException,
   SyncVar,
   ExecutionException,
-  ExecutionContext
+  ExecutionContext,
+  CanAwait
 }
 import scala.concurrent.{ future, promise, blocking }
 import scala.util.{ Try, Success, Failure }
@@ -727,8 +728,8 @@ trait BlockContexts extends TestBase {
   def testPushCustom(): Unit = {
     val orig = BlockContext.current
     val customBC = new BlockContext() {
-      override def internalBlockingCall[T](awaitable: Awaitable[T], atMost: Duration): T =
-        orig.internalBlockingCall(awaitable, atMost)
+      override def internalBlockingCall[T](awaitable: Awaitable[T], atMost: Duration, permission: CanAwait): T =
+        orig.internalBlockingCall(awaitable, atMost, permission)
     }
 
     val bc = getBlockContext({
@@ -744,8 +745,8 @@ trait BlockContexts extends TestBase {
   def testPopCustom(): Unit = {
     val orig = BlockContext.current
     val customBC = new BlockContext() {
-      override def internalBlockingCall[T](awaitable: Awaitable[T], atMost: Duration): T =
-        orig.internalBlockingCall(awaitable, atMost)
+      override def internalBlockingCall[T](awaitable: Awaitable[T], atMost: Duration, permission: CanAwait): T =
+        orig.internalBlockingCall(awaitable, atMost, permission)
     }
 
     val bc = getBlockContext({

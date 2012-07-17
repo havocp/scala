@@ -17,6 +17,25 @@ package object concurrent {
   type CancellationException = java.util.concurrent.CancellationException
   type TimeoutException =      java.util.concurrent.TimeoutException
 
+  sealed trait CanAwait
+  
+  object Await {
+    private val canAwaitEvidence = new CanAwait {}
+    
+    @throws(classOf[TimeoutException])
+    def ready[T](awaitable: Awaitable[T], atMost: Duration): awaitable.type = {
+      result[Unit](new Awaitable[Unit] { // TODO consider having 2 methods in BlockContext, one for ready and one for result
+        override def ready(atMost: Duration)(implicit permit: CanAwait): this.type = { awaitable.ready(atMost); this }
+        override def result(atMost: Duration)(implicit permit: CanAwait): Unit = awaitable.ready(atMost)
+      }, atMost)
+      awaitable
+    }
+    
+    @throws(classOf[Exception])
+    def result[T](awaitable: Awaitable[T], atMost: Duration): T =
+      BlockContext.current.internalBlockingCall(awaitable, atMost, canAwaitEvidence)
+  }
+
   /** Starts an asynchronous computation and returns a `Future` object with the result of that computation.
    *  
    *  The result becomes available once the asynchronous computation is completed.
@@ -45,6 +64,7 @@ package object concurrent {
    *  - InterruptedException - in the case that a wait within the blockable object was interrupted
    *  - TimeoutException - in the case that the blockable object timed out
    */
+  @throws(classOf[Exception])
   def blocking[T](body: =>T): T = blocking(impl.Future.body2awaitable(body), Duration.Inf)
 
   /** Blocks on an awaitable object.
@@ -56,26 +76,7 @@ package object concurrent {
    *  - InterruptedException - in the case that a wait within the blockable object was interrupted
    *  - TimeoutException - in the case that the blockable object timed out
    */
-  def blocking[T](awaitable: Awaitable[T], atMost: Duration): T =
-    BlockContext.current.internalBlockingCall(awaitable, atMost)
-}
+  @throws(classOf[Exception])
+  def blocking[T](awaitable: Awaitable[T], atMost: Duration): T = Await.result(awaitable, atMost)
 
-/* concurrency constructs */
-package concurrent {
-  
-  sealed trait CanAwait
-  
-  object Await {
-    private[concurrent] implicit val canAwaitEvidence = new CanAwait {}
-    
-    def ready[T](awaitable: Awaitable[T], atMost: Duration): awaitable.type = {
-      blocking(awaitable, atMost)
-      awaitable
-    }
-    
-    def result[T](awaitable: Awaitable[T], atMost: Duration): T = {
-      blocking(awaitable, atMost)
-    }
-    
-  }
 }

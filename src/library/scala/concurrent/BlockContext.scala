@@ -27,11 +27,11 @@ import scala.concurrent.util.Duration
  * {{{
  *  val oldContext = BlockContext.current
  *  val myContext = new BlockContext {
- *    override def internalBlockingCall[T](awaitable: Awaitable[T], atMost: Duration): T = {
+ *    override def internalBlockingCall[T](awaitable: Awaitable[T], atMost: Duration, permission: CanAwait): T = {
  *      // you'd have code here doing whatever you need to do
  *      // when the thread is about to block.
  *      // Then you'd chain to the previous context:
- *      oldContext.internalBlockingCall(awaitable, atMost)
+ *      oldContext.internalBlockingCall(awaitable, atMost, permission)
  *    }
  *  }
  *  BlockContext.withBlockContext(myContext) {
@@ -43,19 +43,17 @@ import scala.concurrent.util.Duration
 trait BlockContext {
 
   /** Used internally by the framework; blocks execution for at most
-   * `atMost` time while waiting for an `awaitable` object to become ready.
+   * `atMost` time while waiting for an `awaitable` to produce its result.
    *
-   * Clients should use `scala.concurrent.blocking` instead; this is
-   * the implementation of `scala.concurrent.blocking`, generally
-   * provided by a `scala.concurrent.ExecutionContext` or `java.util.concurrent.Executor`.
+   * Clients must use `scala.concurrent.blocking` or `scala.concurrent.Await` instead.
    */
-  def internalBlockingCall[T](awaitable: Awaitable[T], atMost: Duration): T
+  def internalBlockingCall[T](awaitable: Awaitable[T], atMost: Duration, permission: CanAwait): T
 }
 
 object BlockContext {
   private object DefaultBlockContext extends BlockContext {
-    override def internalBlockingCall[T](awaitable: Awaitable[T], atMost: Duration): T =
-      awaitable.result(atMost)(Await.canAwaitEvidence)
+    override def internalBlockingCall[T](awaitable: Awaitable[T], atMost: Duration, permission: CanAwait): T =
+      awaitable.result(atMost)(permission)
   }
 
   private val contextLocal = new ThreadLocal[BlockContext]() {
